@@ -363,7 +363,7 @@ PHASE 1 FINDINGS
    product_category_name_english
 */
 
--- Geolocation 的组合是否真的唯一
+-- Geolocation
 SELECT
     geolocation_zip_code_prefix,
     geolocation_lat,
