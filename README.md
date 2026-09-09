@@ -1,742 +1,408 @@
-Brazilian E-Commerce Analysis — Olist
+# Olist E-Commerce Data Analysis
 
-Project Overview
+**SQL + Python analysis of 96K+ delivered orders from the Brazilian E-Commerce Public Dataset by Olist.**
 
-This project analyses the Brazilian E-Commerce Public Dataset by Olist using SQL and Python. The objective is to move beyond dashboard-style reporting and answer practical business questions around:
+This project explores sales performance, product mix, customer experience, delivery performance, and customer retention using a relational e-commerce dataset.
 
-overall sales performance,
+---
 
-product-category performance,
+## Project Snapshot
 
-regional performance,
+| Metric | Result |
+|---|---:|
+| Product Sales | **13.22M** |
+| Delivered Orders | **96,478** |
+| Unique Customers | **93,358** |
+| Average Order Value | **137.04** |
+| Items per Order | **1.14** |
+| One-Time Customers | **~97%** |
 
-customer satisfaction,
+### Key takeaway
 
-delivery experience,
+> Olist's sales performance was driven primarily by **transaction volume and customer acquisition**, while repeat purchasing remained extremely low.
 
-repeat purchasing,
+---
 
-and customer retention.
+## Business Questions
 
-The analysis was completed primarily in SQLite / SQL inside VS Code, with Python, pandas, and matplotlib used for cohort analysis and visualisation.
+This analysis focuses on five practical questions:
 
-Business Questions
+1. **How did sales performance change over time?**
+2. **Which states and product categories generated the most value?**
+3. **Was growth driven by more orders or higher order values?**
+4. **How was customer satisfaction associated with delivery performance?**
+5. **Were customers returning after their first purchase?**
 
-The project was structured around the following questions:
+---
 
-How has completed product sales performance changed over time?
+## Tech Stack
 
-Is sales growth driven mainly by order volume or by higher spending per order?
+`SQL` · `SQLite` · `Python` · `pandas` · `matplotlib` · `Jupyter Notebook` · `VS Code` · `Git`
 
-Which states contribute most to sales?
+---
 
-Which product categories are high-volume versus high-value?
+## Repository Structure
 
-How concentrated are sales across product categories?
-
-How does customer satisfaction vary across product categories?
-
-Is delivery delay associated with lower review scores?
-
-How often do customers return after their first purchase?
-
-Does the business appear to rely more on repeat purchasing or customer acquisition?
-
-Dataset
-
-The Olist dataset contains multiple relational tables covering customers, orders, order items, payments, reviews, products, sellers, category translations, and geolocation.
-
-Main tables
-
-Table
-
-Grain
-
-Candidate key
-
-olist_customers_dataset
-
-One row per customer record
-
-customer_id
-
-olist_orders_dataset
-
-One row per order
-
-order_id
-
-olist_order_items_dataset
-
-One row per item within an order
-
-(order_id, order_item_id)
-
-olist_order_payments_dataset
-
-One row per payment record within an order
-
-(order_id, payment_sequential)
-
-olist_order_reviews_dataset
-
-One row per review record associated with an order
-
-review_id / verified at source level
-
-olist_products_dataset
-
-One row per product
-
-product_id
-
-olist_sellers_dataset
-
-One row per seller
-
-seller_id
-
-olist_geolocation_dataset
-
-Multiple geographic observations per ZIP-code prefix
-
-No single confirmed raw-table key
-
-product_category_name_translation
-
-One row per category translation
-
-product_category_name
-
-Core relationships
-
-erDiagram
-    CUSTOMERS ||--o{ ORDERS : customer_id
-    ORDERS ||--o{ ORDER_ITEMS : order_id
-    ORDERS ||--o{ PAYMENTS : order_id
-    ORDERS ||--o{ REVIEWS : order_id
-    PRODUCTS ||--o{ ORDER_ITEMS : product_id
-    SELLERS ||--o{ ORDER_ITEMS : seller_id
-    CATEGORY_TRANSLATION ||--o{ PRODUCTS : product_category_name
-
-A key modelling decision was to use customer_unique_id when identifying the same underlying customer across multiple orders.
-
-Tools
-
-VS Code
-
-SQLite
-
-SQLTools / SQLite extensions
-
-SQL
-
-Python
-
-pandas
-
-matplotlib
-
-Jupyter Notebook
-
-Git / GitHub
-
-Project Structure
-
+```text
 olist-ecommerce-analysis/
-│
-├── data/
-│   └── Olist CSV files
+├── notebook/
+│   └── 01_cohort_analysis.ipynb
 │
 ├── sql/
-│   ├── project.db
 │   ├── 01_data_understanding.sql
 │   ├── 02_data_quality.sql
 │   ├── 03_sales_analysis.sql
 │   ├── 04_product_analysis.sql
 │   ├── 05_review_analysis.sql
-│   └── 06_customer_analysis.sql
+│   ├── 06_customer_analysis.sql
+│   └── 07_rfm_analysis.sql
 │
-├── notebooks/
-│   └── 01_cohort_analysis.ipynb
-│
+├── load_data.py
+├── .gitignore
 └── README.md
+```
 
-Analysis Workflow
+---
 
-1. Data Understanding
+# Analysis
 
-The first phase focused on understanding table grain, candidate keys, relationships, and one-to-many joins before calculating any business metrics.
+## 1. Data Understanding
 
-This step was important because directly joining tables such as:
+Before calculating metrics, I first established the **grain, candidate keys, and relationships** of each table.
 
-orders -> order_items, and
+Examples:
 
-orders -> order_payments
+- `orders`: one row per order
+- `order_items`: one row per item within an order
+- `payments`: one row per payment record
+- `products`: one row per product
 
-can multiply rows and overstate metrics if the target grain is not controlled.
+This was important because several Olist tables have **one-to-many relationships**.
 
-Examples of safeguards used later in the analysis include:
+For example:
 
+```text
+orders
+  1
+  │
+  └── N order_items
+```
+
+A direct join can duplicate order-level data, so metrics such as order count use:
+
+```sql
 COUNT(DISTINCT order_id)
+```
 
-and pre-aggregating payment or review records before joining them to other one-to-many tables.
+and some tables are aggregated before joining.
 
-2. Data Quality
+---
 
-Data-quality checks covered:
+## 2. Data Quality
 
-missing values,
+The dataset was checked for:
 
-duplicate identifiers,
+- missing values
+- duplicate identifiers
+- invalid numeric values
+- inconsistent dates
+- categorical anomalies
+- foreign-key mismatches
 
-invalid values,
+### Notable findings
 
-date consistency,
+- **2,965 orders** had no customer delivery date.
+- Missing delivery dates were mostly associated with incomplete orders.
+- Product categories contained some missing values.
+- Review text was often missing, but review scores were still usable.
+- Geolocation ZIP prefixes were not unique and require aggregation before joining.
 
-categorical consistency,
+The analysis therefore distinguishes between **true data-quality issues** and **valid business missingness**.
 
-and referential integrity.
+---
 
-Main observations
+## 3. Sales Performance
 
-order_id and customer_id checks did not identify duplicate primary identifiers in the core order/customer tables.
+Only delivered orders were included in completed-sales metrics.
 
-2,965 orders had a missing order_delivered_customer_date.
+```sql
+WHERE order_status = 'delivered'
+```
 
-Missing delivery dates were interpreted in the context of order status rather than automatically treated as invalid data.
+Product sales were calculated using:
 
-Review comments contain substantial missing text, but this is not necessarily an error because customers can submit ratings without comments.
+```sql
+SUM(order_items.price)
+```
 
-Raw geolocation data contains multiple records for a ZIP-code prefix, so it should not be directly joined to transactional data without prior aggregation.
+### Overall performance
 
-The dataset was considered suitable for analysis once these structural issues were accounted for.
+- **13.22M** in product sales
+- **96,478** delivered orders
+- **93,358** unique customers
+- **137.04** average order value
+- **1.14** items per order
 
-3. Sales Performance Analysis
+### Monthly trend
 
-For consistent completed-sales analysis, only:
+Sales increased strongly through 2017 before stabilising at a higher level during 2018.
 
-order_status = 'delivered'
+A particularly strong month was **November 2017**:
 
-was included.
+- Sales increased **52.37% MoM**
+- Order volume increased sharply
+- AOV decreased from **144.76 to 135.51**
 
-SUM(order_items.price) is described as product sales / GMV-style sales, rather than accounting revenue.
-
-Overall KPIs
-
-KPI
-
-Result
-
-Total product sales
-
-13,221,498.11
-
-Delivered orders
-
-96,478
-
-Unique customers
-
-93,358
-
-Average order value
-
-137.04
-
-Items per order
-
-1.14
-
-Interpretation
-
-The business processed a large number of completed transactions, but the low 1.14 items per order indicates relatively small baskets.
-
-The number of orders is also only slightly above the number of unique customers, which initially suggested weak repeat-purchase behaviour. This was later confirmed in the customer analysis.
-
-Monthly Sales Trend
-
-Monthly sales grew substantially through 2017 and then stabilised at a higher level during 2018.
-
-Notable examples:
-
-January 2017 product sales: 111,798.36
-
-November 2017 product sales: 987,765.37
-
-May 2018 product sales: 977,544.69
-
-November 2017 recorded a strong 52.37% month-over-month increase in product sales.
-
-However, AOV declined from 144.76 to 135.51, while order volume increased sharply.
-
-Insight
-
-The November 2017 sales increase was primarily volume-driven, rather than caused by higher customer spending per order.
+**Interpretation:** the sales increase was primarily **volume-driven**, not caused by customers spending more per order.
 
 August 2018 showed the opposite pattern:
 
-orders increased,
+- Orders increased
+- Customers increased
+- Sales decreased **3.38%**
+- AOV fell from **140.92 to 132.04**
 
-customers increased,
+**Interpretation:** higher transaction volume was not enough to offset lower spending per order.
 
-but product sales declined by 3.38%,
+---
 
-while AOV fell from 140.92 to 132.04.
+## 4. Regional Performance
 
-Insight
+São Paulo was the dominant market.
 
-Higher transaction volume did not automatically create higher sales when average spending per order declined.
+| State | Product Sales | Orders | AOV |
+|---|---:|---:|---:|
+| SP | 5.07M | 40,501 | 125.12 |
+| RJ | 1.76M | 12,350 | 142.48 |
+| MG | 1.55M | 11,354 | 136.73 |
 
-4. Regional Performance
+São Paulo generated approximately **38% of total product sales**, despite having an AOV below the overall average.
 
-São Paulo was the dominant customer market.
+**Interpretation:** SP's strength came mainly from **scale and transaction volume**.
 
-State
+---
 
-Product sales
+## 5. Product & Category Performance
 
-Orders
+The analysis compared:
 
-AOV
+- total product sales
+- order volume
+- order-item volume
+- sales per order
+- sales share
+- cumulative sales share
 
-SP
+### Leading categories
 
-5,067,633.16
+| Category | Product Sales | Orders | Sales / Order |
+|---|---:|---:|---:|
+| health_beauty | 1.23M | 8,647 | 142.61 |
+| watches_gifts | 1.17M | 5,495 | 212.23 |
+| bed_bath_table | 1.02M | 9,272 | 110.38 |
+| sports_leisure | 954.9K | 7,530 | 126.81 |
+| computers_accessories | 888.7K | 6,530 | 136.10 |
 
-40,501
+### Different category economics
 
-125.12
+**bed_bath_table**
+- high order volume
+- relatively lower sales per order
+- **volume-driven**
 
-RJ
+**watches_gifts**
+- fewer orders
+- much higher sales per order
+- **value-driven**
 
-1,759,651.13
+**computers**
+- only 177 orders
+- sales per order of **1,235.50**
+- **low-volume, high-value niche**
 
-12,350
+### Sales concentration
 
-142.48
+- Top 3 categories: **~25.9%** of sales
+- Top 5 categories: **~39.8%**
+- Top 10 categories: **~62.4%**
 
-MG
+---
 
-1,552,481.83
+## 6. Customer Experience
 
-11,354
+Review data was first aggregated to **order level** before being combined with order-item data.
 
-136.73
+This avoids row multiplication from joining multiple one-to-many tables.
 
-Key observations
+The analysis compared:
 
-São Paulo contributed approximately 38.33% of total product sales.
+- average review score
+- low-rating rate
+- five-star rate
+- review coverage
+- delivery delay
 
-It also represented approximately 41.98% of delivered orders.
+### Delivery vs review
 
-SP's AOV of 125.12 was below the overall AOV of 137.04.
+Delivery performance was grouped into:
 
-Insight
+- On Time / Early
+- 1–3 Days Late
+- 4–7 Days Late
+- 8+ Days Late
 
-São Paulo's performance was driven primarily by scale and transaction volume, rather than unusually high spending per order.
+The goal was to test whether increasing delivery delay was **associated with** poorer customer satisfaction.
 
-Smaller states sometimes recorded much higher AOVs, but their limited order volumes meant they contributed relatively little to total sales.
+Because this is observational data, the project avoids making causal claims.
 
-5. Product & Category Analysis
+---
 
-Category performance was analysed using:
+## 7. Customer Behaviour & Retention
 
-total product sales,
+Customer purchase frequency showed a highly unusual pattern:
 
-order volume,
+| Orders per Customer | Customers |
+|---:|---:|
+| 1 | **90,557** |
+| 2 | 2,573 |
+| 3 | 181 |
+| 4+ | very small |
 
-order-item volume,
+Approximately **97% of customers placed only one delivered order**.
 
-sales per order,
+### Why I did not force traditional RFM segmentation
 
-sales share,
+Traditional RFM relies heavily on meaningful variation in purchase frequency.
 
-and cumulative sales share.
+In this dataset:
 
-Leading categories
+```text
+~97% of customers → Frequency = 1
+```
 
-Category
+This makes Frequency a weak segmentation variable.
 
-Product sales
+Instead of mechanically applying RFM, I treated this as a business finding and focused on **first-purchase behaviour and retention**.
 
-Orders
+---
 
-Sales per order
-
-health_beauty
-
-1,233,131.72
-
-8,647
-
-142.61
-
-watches_gifts
-
-1,166,176.98
-
-5,495
-
-212.23
-
-bed_bath_table
-
-1,023,434.76
-
-9,272
-
-110.38
-
-sports_leisure
-
-954,852.55
-
-7,530
-
-126.81
-
-computers_accessories
-
-888,724.61
-
-6,530
-
-136.10
-
-High-volume vs high-value examples
-
-bed_bath_table
-
-highest order volume among the leading categories,
-
-9,272 orders,
-
-lower sales per order of 110.38.
-
-This is primarily a high-volume category.
-
-watches_gifts
-
-fewer orders than several other leading categories,
-
-but sales per order of 212.23.
-
-This is more strongly value-driven.
-
-computers
-
-only 177 orders,
-
-but sales per order of 1,235.50.
-
-This represents a low-volume, high-value niche.
-
-Sales concentration
-
-Top 3 categories generated approximately 25.89% of total product sales.
-
-Top 5 categories generated approximately 39.83%.
-
-Top 10 categories generated approximately 62.43%.
-
-Insight
-
-Olist sales were concentrated in a group of leading categories, but category success was not driven by a single pattern: some categories depended on high transaction volume while others relied on high value per order.
-
-6. Review & Customer Experience Analysis
-
-Review analysis was performed carefully at order level before being associated with product categories.
-
-This avoided multiplying review records when joining them with order-item-level data.
-
-Metrics included:
-
-average review score,
-
-reviewed orders,
-
-low-rating percentage,
-
-five-star percentage,
-
-review coverage,
-
-and delivery performance.
-
-For category-level interpretation, review scores were described as:
-
-reviews for orders containing the category
-
-rather than product-specific satisfaction, because an order can contain multiple product categories.
-
-Delivery Performance vs Reviews
-
-Delivery performance was calculated as:
-
-actual delivery date - estimated delivery date
-
-and grouped into:
-
-On Time / Early
-
-1–3 Days Late
-
-4–7 Days Late
-
-8+ Days Late
-
-The purpose of this analysis was to test whether increasing delivery delay was associated with declining customer satisfaction.
-
-Because the dataset is observational, conclusions are phrased as associations, not causal claims.
-
-7. Customer Behaviour & Retention
-
-Purchase Frequency
-
-Customer purchase-frequency analysis produced a highly imbalanced distribution:
-
-Orders per customer
-
-Customers
-
-1
-
-90,557
-
-2
-
-2,573
-
-3
-
-181
-
-4
-
-28
-
-5
-
-9
-
-6
-
-5
-
-7
-
-3
-
-9
-
-1
-
-15
-
-1
-
-Approximately 97% of customers placed only one delivered order.
-
-Only around 3% made more than one purchase.
-
-Insight
-
-Olist customer behaviour in this dataset is overwhelmingly one-time-purchase driven.
-
-This finding made a traditional RFM loyalty segmentation less useful, because Frequency provides almost no differentiation for the vast majority of customers.
-
-Rather than forcing an RFM framework, the analysis was adapted to focus on customer acquisition, first-purchase experience, and retention.
-
-8. Cohort Retention Analysis
+## 8. Cohort Retention
 
 Customers were grouped by their first purchase month and tracked across subsequent months.
 
-The analysis used:
-
+```text
 M0 = first purchase month
-M1 = one month after first purchase
-M2 = two months after first purchase
+M1 = one month later
+M2 = two months later
 ...
-
-The very small 2016 cohorts were excluded from the main business interpretation.
+```
 
 For meaningful cohorts from 2017 onward:
 
-Month-1 retention generally ranged from approximately 0.18% to 0.72%.
+- M1 retention was generally **below 1%**
+- repeat activity remained very low in later months
+- some late-2017 cohorts performed slightly better
+- there was no consistent long-term improvement
 
-Repeat purchasing remained below 1% in most individual subsequent months.
+**Interpretation:** the business appears to rely much more on **new customer acquisition** than repeat purchasing.
 
-Some late-2017 cohorts showed relatively stronger short-term retention.
+---
 
-There was no consistent long-term improvement in retention across the full observation period.
+# Key Findings
 
-Insight
+### 1. Sales growth was mainly volume-driven
+Strong growth periods were more closely associated with increases in order count than higher AOV.
 
-Most customers did not return in the months immediately following their first purchase.
+### 2. São Paulo dominated through scale
+SP generated the largest share of sales despite below-average order value.
 
-This supports the purchase-frequency result and suggests that Olist sales in this period were much more dependent on customer acquisition and transaction volume than on frequent repeat purchasing.
+### 3. Category performance had different drivers
+Some categories succeeded through volume, while others relied on higher value per order.
 
-Key Business Findings
+### 4. Sales were moderately concentrated
+The top 10 categories generated roughly **62% of product sales**.
 
-Sales growth was mainly volume-driven.
-Major growth periods were more strongly associated with increases in completed orders than with increases in AOV.
+### 5. Repeat purchasing was extremely weak
+Approximately **97% of customers purchased only once**.
 
-AOV still materially influenced monthly performance.
-August 2018 showed that increasing order volume could be offset by lower customer spending per order.
+### 6. Traditional RFM was not a good fit
+The analysis was adapted based on the observed data rather than forcing a standard framework.
 
-São Paulo dominated through scale.
-SP generated over 38% of total product sales despite having a below-average AOV.
+---
 
-Category performance followed different business models.
-Categories such as bed_bath_table were volume-driven, while categories such as watches_gifts relied more heavily on higher sales per order.
+# Business Recommendations
 
-Sales were moderately concentrated.
-The top 10 categories accounted for approximately 62.43% of product sales.
+Based on the analysis:
 
-Repeat purchasing was exceptionally weak.
-Approximately 97% of customers completed only one delivered order.
+**Improve second-purchase conversion**  
+With ~97% one-time customers, converting recent first-time buyers into a second purchase may be more valuable than traditional loyalty segmentation.
 
-Traditional RFM segmentation was therefore not an appropriate primary method.
-The analysis was adapted instead of mechanically applying a framework that did not fit the observed customer behaviour.
+**Protect high-volume categories**  
+Categories such as `bed_bath_table` depend heavily on transaction volume, so availability and fulfilment reliability are important.
 
-Customer acquisition and first-order experience appear especially important.
-Extremely low monthly cohort retention suggests that second-purchase conversion is a more relevant business question than traditional loyalty segmentation.
+**Grow high-value categories carefully**  
+Categories such as `watches_gifts` and `computers` show strong value per order and may benefit from targeted acquisition.
 
-Analytical Caveats
+**Monitor delivery experience**  
+Delivery-delay analysis should be used alongside review scores to identify operational issues associated with poor customer experience.
 
-Product sales vs revenue
+**Track both volume and value**  
+Sales should always be interpreted together with order count and AOV; either can materially change overall performance.
 
-This project uses:
+---
 
-SUM(order_items.price)
+# Skills Demonstrated
 
-as product sales.
+### SQL
+- JOINs
+- CTEs
+- `CASE WHEN`
+- aggregation
+- date functions
+- window functions
+- `LAG()`
+- `ROW_NUMBER()`
+- cumulative sums
+- cohort calculations
 
-It should not be interpreted as accounting revenue because the dataset does not provide a complete view of:
+### Data Analysis
+- KPI design
+- sales-driver analysis
+- data-quality validation
+- customer behaviour
+- cohort retention
+- category concentration
+- customer experience analysis
 
-commissions,
+### Data Modelling
+- table grain
+- candidate keys
+- foreign keys
+- one-to-many relationships
+- avoiding row multiplication
 
-refunds,
+### Python
+- pandas
+- pivot tables
+- cohort matrices
+- matplotlib
 
-seller payouts,
+---
 
-operating costs,
+## Next Steps
 
-or other accounting adjustments.
+Potential extensions:
 
-Missing calendar months
+- exploratory data analysis (EDA)
+- first-order experience vs repeat purchase
+- seller performance analysis
+- geographic visualisation
+- Power BI executive dashboard
 
-Month-over-month calculations using LAG() compare the previous available row, not automatically the previous calendar month.
+---
 
-The very sparse 2016 data was therefore excluded from the main trend interpretation.
+## Dataset
 
-Category reviews
+**Brazilian E-Commerce Public Dataset by Olist**
 
-Reviews are provided at order level. If an order contains multiple categories, a review cannot be uniquely attributed to one specific product category.
-
-Retention
-
-Monthly cohort retention measures customer activity in each individual month. It is not a survival-retention metric and therefore does not need to decrease monotonically.
-
-What I Learned
-
-This project strengthened practical skills in:
-
-SQL
-
-joins,
-
-grouping and aggregation,
-
-CASE WHEN,
-
-CTEs,
-
-date functions,
-
-window functions,
-
-LAG(),
-
-ROW_NUMBER(),
-
-cumulative sums,
-
-data-grain management,
-
-and preventing row multiplication.
-
-Data Analysis
-
-KPI definition,
-
-sales-driver analysis,
-
-customer behaviour analysis,
-
-cohort retention,
-
-category concentration,
-
-customer-experience analysis,
-
-and distinguishing correlation from causation.
-
-Data Modelling
-
-understanding grain,
-
-candidate keys,
-
-foreign keys,
-
-one-to-many relationships,
-
-and pre-aggregating data before joins.
-
-Python
-
-pandas pivot tables,
-
-cohort matrices,
-
-and matplotlib visualisation.
-
-Future Improvements
-
-Possible extensions include:
-
-first-order experience vs repeat-purchase analysis,
-
-order-value distribution and additional EDA,
-
-delivery-delay distributions,
-
-customer-acquisition analysis,
-
-seller-performance analysis,
-
-geographic visualisation,
-
-and a lightweight Power BI executive dashboard.
-
-Summary
-
-This project demonstrates an end-to-end analytical workflow:
-
-Raw relational data
-        ↓
-Data understanding
-        ↓
-Data-quality validation
-        ↓
-SQL analysis
-        ↓
-Customer and product insights
-        ↓
-Python cohort visualisation
-        ↓
-Business interpretation
-
-The main takeaway is that Olist's completed sales performance was driven largely by transaction volume and customer acquisition, while repeat purchasing remained unusually low. The project therefore prioritised analytical methods that fit the observed business behaviour rather than applying standard customer-segmentation techniques mechanically.
+The dataset contains anonymised Brazilian e-commerce orders, customers, products, payments, sellers, reviews, and delivery information.
