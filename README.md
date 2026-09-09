@@ -389,18 +389,6 @@ Sales should always be interpreted together with order count and AOV; either can
 
 ---
 
-## Next Steps
-
-Potential extensions:
-
-- exploratory data analysis (EDA)
-- first-order experience vs repeat purchase
-- seller performance analysis
-- geographic visualisation
-- Power BI executive dashboard
-
----
-
 ## Dataset
 
 **Brazilian E-Commerce Public Dataset by Olist**
